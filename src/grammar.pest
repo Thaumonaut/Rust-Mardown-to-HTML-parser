@@ -1,0 +1,6 @@
+word = { LETTER+ }
+phrase = { word ~ (" " ~ word)* }
+tag = { "#"{1, 6} }
+header = { tag ~ ( WHITE_SPACE ~ phrase ) ~ NEWLINE }
+
+headers = {header*}
