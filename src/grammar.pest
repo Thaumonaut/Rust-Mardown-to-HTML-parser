@@ -1,6 +1,65 @@
-word = { LETTER+ }
-phrase = { word ~ (" " ~ word)* }
-tag = { "#"{1, 6} }
-header = { tag ~ ( WHITE_SPACE ~ phrase ) ~ NEWLINE }
+WHITESPACE = { " " | "\t" }
 
-headers = {header*}
+document = { SOI ~ ( block | new_line)* ~ EOI }
+
+block = { code | horizontal_rule | heading | blockquote | list_point | paragraph }
+
+heading = { heading_start ~ line_content ~ new_line }
+list_point = { list_start ~ line_content ~ new_line }
+paragraph = { paragraph_line+ }
+
+paragraph_line = { !(heading_start | list_start | code | horizontal_rule | blockquote) ~ line_content ~ new_line }
+
+line_content = { (bold_italic | bold | italic | inline_code | strikethrough | text)* }
+
+// Specific inline formatting rules (order matters - longest first!)
+// Check for space after fence to avoid list markers, and require matching closing fence
+bold_italic = { (bold_italic_fence ~ !(" ") ~ bold_italic_content ~ bold_italic_fence) | ( bold_fence ~ !(" ") ~ italic ~ bold_fence) }
+bold = { bold_fence ~ !(" ") ~ bold_content ~ bold_fence }
+italic = { italic_fence ~ !(" ") ~ italic_content ~ italic_fence }
+inline_code = { inline_code_fence ~ inline_code_content ~ inline_code_fence }
+// underscore = { underscore_fence ~ !(" ") ~ underscore_content ~ underscore_fence }
+strikethrough = { strikethrough_fence ~ !(" ") ~ strikethrough_content ~ strikethrough_fence }
+
+// Fences
+bold_fence = { ( "**" | "__" ) }
+italic_fence = { ( "*" | "_" ) }
+inline_code_fence = { "`" }
+bold_italic_fence = { ("***" | "___" ) }
+// underscore_fence = { "_" }
+strikethrough_fence = { "~~" }
+
+// Content inside each inline format type (everything except the closing fence and newlines)
+// Must have at least one character (use + instead of *)
+bold_italic_content = { (!(bold_italic_fence | new_line) ~ ANY)+ }
+bold_content = { (italic | bold_text)+ }
+italic_content = { (!(italic_fence | new_line) ~ ANY)+ }
+bold_text = { (!(bold_fence | italic_fence | new_line) ~ ANY)+ }
+// underscore_content = { (!(underscore_fence | new_line) ~ ANY)+ }
+inline_code_content = { (!(inline_code_fence | new_line) ~ ANY)+ }
+strikethrough_content = { (!(strikethrough_fence | new_line) ~ ANY)+ }
+
+// Plain text - match one character at a time (not a newline)
+// This allows fence characters to be treated as text when they don't form complete inline formats
+text = { (!new_line ~ ANY) }
+char = { !(new_line) ~ ANY }
+
+heading_start = { "#"{1,6} ~ "" }
+list_start = { unordered | ordered }
+
+unordered = { ("- " | "* " | "+ ") }
+ordered = { digit+ ~ ". " }
+
+digit = { '0'..'9' }
+new_line = { "\r\n" | "\n" }
+
+code = { code_block_fence ~ code_lang? ~ new_line ~ code_content ~ code_block_fence ~ new_line? }
+code_block_fence = { "```" }
+code_lang = { (!new_line ~ ANY)* }
+code_content = { (!(code_block_fence) ~ ANY)* }
+
+horizontal_rule = { ("-"{3,} | "="{3,} | "*"{3,}) ~ new_line }
+blockquote = { "> " ~ line_content ~ new_line }
+
+underline = { "__" ~ char+ ~ "__" }
+strike = { "~~" ~ char+ ~ "~~" }
