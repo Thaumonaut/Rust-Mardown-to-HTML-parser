@@ -2,14 +2,18 @@ WHITESPACE = { " " | "\t" }
 
 document = { SOI ~ ( block | new_line)* ~ EOI }
 
-block = { comment | code | horizontal_rule | heading | blockquote | list_point | paragraph }
+block = { comment | code | horizontal_rule | heading | blockquote | list | paragraph }
 
 comment = _{ "<!--" ~ (!"-->" ~ ANY)* ~ "-->" }
 
 
 heading = { heading_start ~ line_content ~ new_line }
-list_point = { list_start ~ line_content ~ new_line }
+
+list = ${ list_point+ }
+list_point = ${ indent* ~ list_start ~ line_content ~ new_line }
 paragraph = { paragraph_line+ }
+
+indent = @{ " "{2,} | "\t" }
 
 paragraph_line = { !(heading_start | list_start | code | horizontal_rule | blockquote) ~ line_content ~ new_line }
 
@@ -22,7 +26,6 @@ italic = { italic_fence ~ !(" ") ~ italic_content ~ italic_fence }
 inline_code = { inline_code_fence ~ inline_code_content ~ inline_code_fence }
 strikethrough = { strikethrough_fence ~ !(" ") ~ strikethrough_content ~ strikethrough_fence }
 
-// Fences
 bold_fence = { ( "**" | "__" ) }
 italic_fence = { ( "*" | "_" ) }
 inline_code_fence = { "`" }

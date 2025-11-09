@@ -54,14 +54,13 @@ fn parse_element(pair: pest::iterators::Pair<Rule>) -> String {
         Rule::blockquote => {
             parse_blockquote(pair)
         },
-        Rule::list_point => {
+        Rule::list => {
             parse_list(pair)
         },
         Rule::horizontal_rule => {
             "<hr>\n".to_string()
         },
         _ => {
-            // eprintln!("Unhandled rule: {:?}", pair.as_rule());
             String::new()
         }
     }
@@ -113,11 +112,92 @@ fn parse_code_block(pair: pest::iterators::Pair<Rule>) -> String {
       _ => {}
     }
   }
-  format!("<pre style=\"background-color: #111; color: #0f0; padding: 10px; border-radius: 5px; border: 1px solid #ccc;\"><code>\n{}\n</code></pre>\n", content)
+  format!("<pre style=\"background-color: #b6b6b6ff; padding: 1rem;\"><code>\n{}\n</code></pre>\n", content)
 }
 
+// TODO: Parse markdown blockquotes
 fn parse_blockquote(pair: pest::iterators::Pair<Rule>) -> String {String::from(pair.into_inner().as_str())}
-fn parse_list(pair: pest::iterators::Pair<Rule>) ->       String {String::from(pair.into_inner().as_str())}
+
+#[derive(Debug, PartialEq, Clone)]
+enum ListType {
+    Unordered,
+    Ordered,
+    None,
+}
+
+impl ListType {
+  fn opening_tag(&self) -> String {
+    match self {
+      ListType::Unordered => "<ul>".to_string(),
+      ListType::Ordered => "<ol>".to_string(),
+      ListType::None => format!(""),
+    }
+  }
+
+  fn closing_tag(&self) -> String {
+    match self {
+      ListType::Unordered => "</ul>".to_string(),
+      ListType::Ordered => "</ol>".to_string(),
+      ListType::None => format!(""),
+    }
+  }
+}
+
+fn parse_list(pair: pest::iterators::Pair<Rule>) -> String {
+    let mut content = String::new();
+    let mut depth_stack: Vec<(usize, ListType)> = Vec::new();
+    
+    for inner_pair in pair.into_inner() {
+        if inner_pair.as_rule() != Rule::list_point {
+            continue;
+        }
+        
+        let mut current_depth = 0;
+        let mut list_type = ListType::None;
+        let mut item_content = String::new();
+        
+        for child in inner_pair.into_inner() {
+            match child.as_rule() {
+                Rule::indent => {
+                    current_depth = child.as_str().len();
+                }
+                Rule::list_start => {
+                    if let Some(marker) = child.into_inner().next() {
+                        list_type = match marker.as_rule() {
+                            Rule::ordered => ListType::Ordered,
+                            Rule::unordered => ListType::Unordered,
+                            _ => ListType::None,
+                        };
+                    }
+                }
+                Rule::line_content => {
+                    item_content = parse_line_content(child);
+                }
+                _ => {}
+            }
+        }
+        
+        while depth_stack.len() > 0 && depth_stack.last().unwrap().0 > current_depth {
+            let (prev_depth, prev_type) = depth_stack.pop().unwrap();
+            content.push_str(&format!("{}{}\n", " ".repeat(prev_depth), prev_type.closing_tag()));
+        }
+        
+        if depth_stack.is_empty() || depth_stack.last().unwrap().1 != list_type || depth_stack.last().unwrap().0 < current_depth {
+            if depth_stack.is_empty() || depth_stack.last().unwrap().0 < current_depth {
+                content.push_str(&format!("{}{}\n", " ".repeat(current_depth), list_type.opening_tag()));
+                depth_stack.push((current_depth, list_type.clone()));
+            }
+        }
+        
+        content.push_str(&format!("{}<li>{}</li>\n", " ".repeat(current_depth + 2), item_content));
+    }
+    
+    while let Some((depth, list_type)) = depth_stack.pop() {
+        content.push_str(&format!("{}{}\n", " ".repeat(depth), list_type.closing_tag()));
+    }
+    
+    content
+}
 
 
 fn simple_html_element_builder(tag: String, content: &str) -> String {
